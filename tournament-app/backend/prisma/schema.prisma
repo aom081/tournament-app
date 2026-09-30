@@ -1,0 +1,416 @@
+// Prisma schema for the Tournament Management Web Application.
+//
+// PHASE 1 SCOPE: core domain model only (schema + constraints).
+// No services, no business logic, no auth flows, no pairing/bracket
+// engines. See docs/architecture/domain-model.md for the full design
+// rationale, naming decisions, and documented limitations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum TournamentFormat {
+  SWISS
+  KNOCKOUT
+  ROUND_ROBIN
+  SWISS_TO_KNOCKOUT
+}
+
+enum TournamentStatus {
+  DRAFT
+  REGISTRATION
+  READY
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+  CANCELLED
+}
+
+enum RegistrationStatus {
+  REGISTERED
+  WITHDRAWN
+  DISQUALIFIED
+}
+
+enum RoundStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum MatchStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  BYE
+  CANCELLED
+}
+
+enum UnitStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+// ---------------------------------------------------------------------------
+// Identity & RBAC
+//
+// Role/Permission are a generic, many-to-many catalog (not hard-coded to
+// "Organizer"/"Competitor"). Assignment is split into two explicit tables
+// rather than one table with a nullable scope column: Postgres unique
+// indexes treat NULL as distinct-from-NULL, so a single nullable
+// `tournamentId` column could not actually prevent duplicate *global*
+// role assignments. Two explicit tables give each scope a real,
+// enforceable uniqueness constraint.
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  participants        Participant[]
+  createdTournaments  Tournament[]         @relation("TournamentCreatedBy")
+  globalRoles         UserRole[]
+  tournamentRoles     TournamentUserRole[]
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  rolePermissions     RolePermission[]
+  userRoles           UserRole[]
+  tournamentUserRoles TournamentUserRole[]
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+}
+
+/// Join table: which Permissions a Role grants.
+model RolePermission {
+  id           String   @id @default(uuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
+}
+
+/// Global (site-wide) role assignment, e.g. a platform administrator.
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+}
+
+/// Tournament-scoped role assignment, e.g. "Organizer of Tournament X",
+/// "Referee of Tournament Y". Any number of custom roles may be scoped
+/// this way; the schema does not privilege Organizer/Competitor over
+/// any other role name.
+model TournamentUserRole {
+  id           String   @id @default(uuid())
+  userId       String
+  roleId       String
+  tournamentId String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId, tournamentId])
+  @@index([roleId])
+  @@index([tournamentId])
+}
+
+// ---------------------------------------------------------------------------
+// Participant (deliberately separate from User)
+//
+// A Participant may exist without a linked User account (e.g. a player
+// entered by an organizer who never signs up). If the linked User is
+// later deleted, the Participant record -- and all tournament history
+// attached to it -- is preserved; only the `userId` link is cleared.
+// ---------------------------------------------------------------------------
+
+model Participant {
+  id          String   @id @default(uuid())
+  displayName String
+  userId      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user                   User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tournamentParticipants TournamentParticipant[]
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Tournament & registration
+// ---------------------------------------------------------------------------
+
+model Tournament {
+  id            String           @id @default(uuid())
+  name          String
+  format        TournamentFormat
+  status        TournamentStatus @default(DRAFT)
+  /// Structured tournament settings (participants, scoring, match
+  /// format, pairing, tie-break, result confirmation). Stored as JSON
+  /// rather than normalized tables while the exact shape of each
+  /// sub-config is still being defined by the pairing/tie-break engine
+  /// phases; validated at the application layer -- see
+  /// docs/tournament/configuration.md and
+  /// src/domain/tournament/configuration.ts.
+  configuration Json
+  startDate     DateTime?
+  endDate       DateTime?
+  createdById   String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  createdBy           User                     @relation("TournamentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  tournamentUserRoles TournamentUserRole[]
+  participants        TournamentParticipant[]
+  rounds              Round[]
+  results             TournamentResult[]
+  standings           Standing[]
+  bracket             Bracket?
+
+  @@index([format])
+  @@index([status])
+}
+
+/// A Participant's registration in a specific Tournament. This is the
+/// entity that Match/Unit/Result records point to (not Participant
+/// directly), so a participant's role is always tournament-scoped.
+model TournamentParticipant {
+  id            String             @id @default(uuid())
+  tournamentId  String
+  participantId String
+  seed          Int?
+  status        RegistrationStatus @default(REGISTERED)
+  registeredAt  DateTime           @default(now())
+
+  tournament  Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Restrict)
+
+  matchParticipants MatchParticipant[]
+  unitWins          Unit[]             @relation("UnitWinner")
+  matchWins         Match[]            @relation("MatchWinner")
+  result            TournamentResult?
+  standings         Standing[]
+
+  // Prevents duplicate tournament registration.
+  @@unique([tournamentId, participantId])
+  @@index([participantId])
+}
+
+// ---------------------------------------------------------------------------
+// Rounds, Matches, Units (Games)
+//
+// "Unit" is used as the canonical model name for a single game/unit of
+// play within a Match (a Match may consist of multiple Units -- e.g.
+// games within a set), to keep the schema sport-agnostic. It is
+// referred to as "Game / Unit" in product-facing documentation.
+// ---------------------------------------------------------------------------
+
+model Round {
+  id           String      @id @default(uuid())
+  tournamentId String
+  roundNumber  Int
+  name         String?
+  status       RoundStatus @default(PENDING)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime    @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
+  matches    Match[]
+  standings  Standing[]
+
+  @@unique([tournamentId, roundNumber])
+}
+
+model Match {
+  id                             String      @id @default(uuid())
+  roundId                        String
+  matchNumber                    Int
+  status                         MatchStatus @default(SCHEDULED)
+  winnerTournamentParticipantId  String?
+  bracketId                      String?
+  bracketPosition                Int?
+  nextMatchId                    String?
+  createdAt                      DateTime    @default(now())
+  updatedAt                      DateTime    @updatedAt
+
+  round   Round                  @relation(fields: [roundId], references: [id], onDelete: Restrict)
+  winner  TournamentParticipant? @relation("MatchWinner", fields: [winnerTournamentParticipantId], references: [id], onDelete: Restrict)
+  bracket Bracket?               @relation(fields: [bracketId], references: [id], onDelete: Restrict)
+
+  // Self-relation: the match the winner of this match advances into
+  // (knockout-style bracket progression).
+  nextMatch       Match?  @relation("MatchAdvancement", fields: [nextMatchId], references: [id], onDelete: Restrict)
+  previousMatches Match[] @relation("MatchAdvancement")
+
+  participants MatchParticipant[]
+  units        Unit[]
+
+  // Prevents duplicate match numbering within a round. Match does not
+  // carry its own tournamentId column: tournament scope is always
+  // derived through Round -> Tournament, which makes an "invalid
+  // tournament relationship" (a match belonging to a different
+  // tournament than its round) structurally impossible rather than
+  // something that has to be validated after the fact.
+  @@unique([roundId, matchNumber])
+  @@index([bracketId])
+  @@index([winnerTournamentParticipantId])
+  @@index([nextMatchId])
+}
+
+/// Which TournamentParticipant(s) are seated in a Match, and in which
+/// slot. Modeled as a join table (rather than fixed participantA/B
+/// columns) so a Match is not hard-coded to exactly two participants --
+/// keeping the schema usable for formats beyond simple 1v1 matches.
+model MatchParticipant {
+  id                      String   @id @default(uuid())
+  matchId                 String
+  tournamentParticipantId String
+  slot                    Int
+  createdAt               DateTime @default(now())
+
+  match                 Match                 @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  tournamentParticipant TournamentParticipant @relation(fields: [tournamentParticipantId], references: [id], onDelete: Restrict)
+
+  // A participant cannot appear twice in the same match, and a slot
+  // cannot be double-booked within a match.
+  @@unique([matchId, tournamentParticipantId])
+  @@unique([matchId, slot])
+  @@index([tournamentParticipantId])
+}
+
+/// A single game/unit of play within a Match (the "Game / Unit Result"
+/// layer of the result hierarchy). `winnerTournamentParticipantId` is
+/// null for a draw or a not-yet-completed unit.
+model Unit {
+  id                             String     @id @default(uuid())
+  matchId                        String
+  unitNumber                     Int
+  status                         UnitStatus @default(PENDING)
+  winnerTournamentParticipantId  String?
+  createdAt                      DateTime   @default(now())
+  updatedAt                      DateTime   @updatedAt
+
+  match  Match                  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  winner TournamentParticipant? @relation("UnitWinner", fields: [winnerTournamentParticipantId], references: [id], onDelete: Restrict)
+
+  // Prevents duplicate game/unit numbers within a match.
+  @@unique([matchId, unitNumber])
+  @@index([winnerTournamentParticipantId])
+}
+
+// ---------------------------------------------------------------------------
+// Bracket (KNOCKOUT / SWISS_TO_KNOCKOUT)
+// ---------------------------------------------------------------------------
+
+/// One Bracket per Tournament. Match rows for the knockout stage link
+/// back to it via `bracketId` and use `bracketPosition`/`nextMatchId`
+/// to encode tree structure. Bracket *generation* logic is out of
+/// scope for this phase -- this is storage only.
+model Bracket {
+  id           String   @id @default(uuid())
+  tournamentId String   @unique
+  size         Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
+  matches    Match[]
+}
+
+// ---------------------------------------------------------------------------
+// Result hierarchy (top of the pyramid): TournamentResult / Standing
+//
+// Game/Unit Result -> Match Result -> Tournament Result -> Standings
+//
+// The first two layers are represented by fields directly on Unit and
+// Match (status + winner) rather than separate tables, since a Phase 1
+// core-model scope does not call for a distinct Game/Unit-Result or
+// Match-Result entity. TournamentResult is the per-participant
+// aggregate for a tournament; Standing is a ranked, publishable
+// snapshot (overall or per-round) derived from it.
+// ---------------------------------------------------------------------------
+
+/// Aggregated, continuously-updated result for one TournamentParticipant
+/// within one Tournament. One row per participant per tournament.
+model TournamentResult {
+  id                      String   @id @default(uuid())
+  tournamentId            String
+  tournamentParticipantId String   @unique
+  points                  Float    @default(0)
+  wins                    Int      @default(0)
+  losses                  Int      @default(0)
+  draws                   Int      @default(0)
+  unitsWon                Int      @default(0)
+  unitsLost               Int      @default(0)
+  rank                    Int?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  tournament            Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
+  tournamentParticipant TournamentParticipant @relation(fields: [tournamentParticipantId], references: [id], onDelete: Restrict)
+
+  @@index([tournamentId])
+}
+
+/// A ranked, publishable standings snapshot. `roundId` is null for the
+/// overall/final standings and set for a per-round snapshot (matching
+/// the Swiss architecture's "Organizer Review -> Publication" step,
+/// which publishes standings after each round).
+model Standing {
+  id                      String   @id @default(uuid())
+  tournamentId            String
+  roundId                 String?
+  tournamentParticipantId String
+  rank                    Int
+  points                  Float
+  publishedAt             DateTime @default(now())
+
+  tournament            Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
+  round                 Round?                @relation(fields: [roundId], references: [id], onDelete: Restrict)
+  tournamentParticipant TournamentParticipant @relation(fields: [tournamentParticipantId], references: [id], onDelete: Restrict)
+
+  @@unique([tournamentId, roundId, tournamentParticipantId])
+  @@index([tournamentId, roundId])
+}
