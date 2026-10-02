@@ -169,6 +169,34 @@ router.post(
   },
 );
 
+router.get(
+  '/tournaments/:tournamentId/participants',
+  authenticate,
+  requirePermission('TOURNAMENT_VIEW', TOURNAMENT_ID_PARAM),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const participants = await tournamentService.getParticipants(req.params.tournamentId);
+      res.status(200).json({ participants });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.get(
+  '/tournaments/:tournamentId/rounds',
+  authenticate,
+  requirePermission('TOURNAMENT_VIEW', TOURNAMENT_ID_PARAM),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rounds = await tournamentService.getRounds(req.params.tournamentId);
+      res.status(200).json({ rounds });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 router.post(
   '/tournaments/:tournamentId/rounds',
   authenticate,

@@ -30,7 +30,7 @@ enum TournamentStatus {
   REGISTRATION
   READY
   IN_PROGRESS
-  COMPLETED
+  COMPLETE
   ARCHIVED
   CANCELLED
 }
@@ -42,23 +42,28 @@ enum RegistrationStatus {
 }
 
 enum RoundStatus {
-  PENDING
+  SCHEDULED
   IN_PROGRESS
-  COMPLETED
+  COMPLETE
 }
 
 enum MatchStatus {
   SCHEDULED
   IN_PROGRESS
-  COMPLETED
+  COMPLETE
   BYE
   CANCELLED
 }
 
 enum UnitStatus {
-  PENDING
+  SCHEDULED
   IN_PROGRESS
-  COMPLETED
+  PARTIAL
+  COMPLETE
+  CONFIRMED
+  DISPUTED
+  CORRECTION_REQUIRED
+  VOID
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +90,7 @@ model User {
   createdTournaments  Tournament[]         @relation("TournamentCreatedBy")
   globalRoles         UserRole[]
   tournamentRoles     TournamentUserRole[]
+  auditLogs           AuditLog[]
 }
 
 model Role {
@@ -181,6 +187,25 @@ model Participant {
 // Tournament & registration
 // ---------------------------------------------------------------------------
 
+enum SnapshotStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model QualificationSnapshot {
+  id           String   @id @default(uuid())
+  tournamentId String   @unique
+  createdAt    DateTime @default(now())
+  configVersion String
+  topN          Int
+  qualifiedParticipants Json
+  status       SnapshotStatus @default(DRAFT)
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@index([tournamentId])
+}
+
 model Tournament {
   id            String           @id @default(uuid())
   name          String
@@ -207,6 +232,7 @@ model Tournament {
   results             TournamentResult[]
   standings           Standing[]
   bracket             Bracket?
+  qualificationSnapshot QualificationSnapshot?
 
   @@index([format])
   @@index([status])
@@ -251,7 +277,7 @@ model Round {
   tournamentId String
   roundNumber  Int
   name         String?
-  status       RoundStatus @default(PENDING)
+  status       RoundStatus @default(SCHEDULED)
   startedAt    DateTime?
   completedAt  DateTime?
   createdAt    DateTime    @default(now())
@@ -324,10 +350,15 @@ model MatchParticipant {
 /// layer of the result hierarchy). `winnerTournamentParticipantId` is
 /// null for a draw or a not-yet-completed unit.
 model Unit {
+  voidReason                     String?
+  updatedById                    String?
+  completedAt                    DateTime?
+  confirmedAt                    DateTime?
+
   id                             String     @id @default(uuid())
   matchId                        String
   unitNumber                     Int
-  status                         UnitStatus @default(PENDING)
+  status                         UnitStatus @default(SCHEDULED)
   winnerTournamentParticipantId  String?
   createdAt                      DateTime   @default(now())
   updatedAt                      DateTime   @updatedAt
@@ -352,6 +383,7 @@ model Bracket {
   id           String   @id @default(uuid())
   tournamentId String   @unique
   size         Int?
+  version      Int      @default(1)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -414,3 +446,28 @@ model Standing {
   @@unique([tournamentId, roundId, tournamentParticipantId])
   @@index([tournamentId, roundId])
 }
+// ---------------------------------------------------------------------------
+// Audit & History
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  tournamentId  String
+  actorId       String
+  action        String
+  entityType    String
+  entityId      String
+  previousState Json?
+  newState      Json?
+  reason        String?
+  correlationId String?
+  createdAt     DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([tournamentId])
+  @@index([entityId])
+  @@index([correlationId])
+}
+

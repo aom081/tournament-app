@@ -112,6 +112,20 @@ export function createTournamentService(deps: { prisma: TournamentServicePrismaC
     return tournament;
   }
 
+  async function getParticipants(tournamentId: string): Promise<TournamentParticipantRecord[]> {
+    return prisma.tournamentParticipant.findMany({
+      where: { tournamentId },
+      orderBy: { seed: 'asc' },
+    });
+  }
+
+  async function getRounds(tournamentId: string): Promise<RoundRecord[]> {
+    return prisma.round.findMany({
+      where: { tournamentId },
+      orderBy: { roundNumber: 'asc' },
+    });
+  }
+
   async function countRegisteredParticipants(tournamentId: string): Promise<number> {
     return prisma.tournamentParticipant.count({ where: { tournamentId, status: 'REGISTERED' } });
   }
@@ -305,6 +319,8 @@ export function createTournamentService(deps: { prisma: TournamentServicePrismaC
     archiveTournament,
     cancelTournament,
     getTournamentOrThrow,
+    getParticipants,
+    getRounds,
   };
 }
 
