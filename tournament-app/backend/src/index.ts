@@ -17,7 +17,7 @@ app.use(cors({
 app.use(express.json());
 
 // --- Health Check ---
-app.get('/health', async (req: Request, res: Response) => {
+app.get('/health', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     // Verify DB connection by performing a simple query
     await prisma.$queryRaw`SELECT 1`;
@@ -27,13 +27,7 @@ app.get('/health', async (req: Request, res: Response) => {
       database: 'connected',
     });
   } catch (error) {
-    console.error('Health check failed:', error);
-    res.status(503).json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      database: 'disconnected',
-      message: error instanceof Error ? error.message : 'Unknown database error',
-    });
+    next(error);
   }
 });
 
@@ -42,7 +36,7 @@ app.get('/health', async (req: Request, res: Response) => {
 // Example: app.use('/api/tournaments', tournamentRoutes);
 
 // --- Error Handling ---
-app.use((err: any, req: Request, res: Response, next: any) => {
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err.stack);
   res.status(500).json({
     error: 'Internal Server Error',
