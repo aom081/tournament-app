@@ -1,5 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useParams } from 'react-router-dom';
 import apiClient from '../../api/client';
 
 async function fetchTournament(id: string) {
@@ -8,7 +9,7 @@ async function fetchTournament(id: string) {
 }
 
 export default function TournamentOverview() {
-  const { tournamentId } = React.useParams() as { tournamentId: string };
+  const { tournamentId } = useParams() as { tournamentId: string };
   const { data, isLoading, error } = useQuery({
     queryKey: ['tournament', tournamentId],
     queryFn: () => fetchTournament(tournamentId),
