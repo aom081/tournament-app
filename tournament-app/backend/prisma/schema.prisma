@@ -233,6 +233,7 @@ model Tournament {
   standings           Standing[]
   bracket             Bracket?
   qualificationSnapshot QualificationSnapshot?
+  auditLogs             AuditLog[]
 
   @@index([format])
   @@index([status])
