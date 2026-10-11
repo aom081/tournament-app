@@ -8,7 +8,7 @@ The GitHub repository could not be cloned into the execution environment, so thi
 
 ## Install
 
-1. Copy this folder into the repository root (or keep it separate as a test runner).
+1. Keep this folder at `tournament-playwright/` in the app repository. The included CI workflow belongs at the repository root in `.github/workflows/playwright.yml` (the ZIP places it there separately).
 2. Install Node.js LTS.
 3. Run:
 
@@ -68,7 +68,7 @@ Use stable `data-testid` attributes on the app to avoid brittle selectors:
 | CORE-07 | Record and confirm match result | P0 |
 | CORE-08 | Correct result and verify standings | P0 |
 | CORE-09 | Swiss top seeds advance to Knockout | P0 |
-| CORE-10 | Knockout bracket / champion flow | P0 |
+| CORE-10 | Generate Knockout bracket and verify match cards | P0 |
 | CORE-11 | Round-robin schedule and standings | P0 |
 | CORE-12 | Competitor cannot manage tournament | P0 |
 | CORE-13 | Reject invalid match result | P0 |
@@ -80,7 +80,8 @@ Use stable `data-testid` attributes on the app to avoid brittle selectors:
 - These are E2E UI tests, not proof of backend/database correctness on their own.
 - Tournament generation tests need a seeded dataset with enough competitors. Cross-score review needs a deliberately prepared score distribution. Swiss-to-Knockout needs Swiss standings already complete. Full Knockout champion validation requires enough seeded players and a supported result workflow.
 - CORE-06 and CORE-09 will fail if those features or controls are not implemented in the deployed UI. Do not mark them as passing by skipping them; report as FAIL/BLOCKED and fix the application or the selector mapping.
-- CORE-10 currently validates that the bracket is generated and visible. To test every round through the champion, extend it with the app's actual match-result controls and seed setup.
+- CORE-10 validates bracket generation and visible match cards only; it does not claim to complete every round or determine a champion. A full champion-flow test requires the app's actual match-result controls and seeded competitors.
 - CORE-12 assumes competitor role does not show create/manage actions. Server-side authorization should also be covered by API tests separately.
 - Prefer running against a staging/test database because these cases create and modify tournament data.
 - HTML report and failure traces are generated under `playwright-report/` and `test-results/`.
+- CI expects `PLAYWRIGHT_BASE_URL` and dedicated organizer/competitor credentials to be configured as GitHub Actions repository secrets. The CI job checks these before running tests.

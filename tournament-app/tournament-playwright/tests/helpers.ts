@@ -61,16 +61,17 @@ export async function login(page: Page, role: 'organizer' | 'competitor' = 'orga
   await expect(page).not.toHaveURL(/\/login(?:[/?#]|$)/, { timeout: 15_000 });
 }
 
-export async function createTournament(page: Page, format: 'Swiss' | 'Knockout' | 'Round-robin' | 'Swiss-to-Knockout') {
+export async function createTournament(page: Page, format: 'Swiss' | 'Knockout' | 'Round-robin' | 'Swiss-to-Knockout'): Promise<string> {
   await clickFirst(page, [
     '[data-testid="create-tournament"]', 'button:has-text("Create Tournament")',
     'button:has-text("New Tournament")', 'button:has-text("สร้างรายการ")',
     'a:has-text("Create Tournament")', 'a:has-text("สร้างรายการ")'
   ], 'create tournament');
+  const tournamentName = `PW ${format} ${Date.now()}`;
   await fillFirst(page, [
     '[data-testid="tournament-name"]', 'input[name="name"]', 'input[placeholder*="name" i]',
     'input[placeholder*="ชื่อ"]'
-  ], `PW ${format} ${Date.now()}`, 'tournament name');
+  ], tournamentName, 'tournament name');
 
   // Select the requested format using a select or a visible option/radio.
   const select = page.locator('[data-testid="tournament-format"], select[name*="format" i], select[name*="type" i]').first();
@@ -91,7 +92,8 @@ export async function createTournament(page: Page, format: 'Swiss' | 'Knockout' 
     'button:has-text("Save")', 'button:has-text("Create")',
     'button:has-text("บันทึก")', 'button:has-text("สร้าง")'
   ], 'save tournament');
-  await expect(page.getByText(new RegExp(`PW ${format}`, 'i')).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(tournamentName, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
+  return tournamentName;
 }
 
 export async function openTournamentOrCreate(page: Page, format: 'Swiss' | 'Knockout' | 'Round-robin' | 'Swiss-to-Knockout') {

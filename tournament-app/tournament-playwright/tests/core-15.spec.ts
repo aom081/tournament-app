@@ -29,17 +29,19 @@ test.describe('Tournament Management — Core 15 E2E tests', () => {
       'button:has-text("Add Player")', 'button:has-text("เพิ่มผู้แข่งขัน")',
       'button:has-text("เพิ่มผู้สมัคร")'
     ], 'add competitor');
+    const competitorName = `PW Competitor ${Date.now()}`;
     await fillFirst(page, [
       '[data-testid="competitor-name"]', 'input[name="competitorName"]',
       'input[name="name"]', 'input[placeholder*="competitor" i]',
       'input[placeholder*="player" i]', 'input[placeholder*="ชื่อ"]'
-    ], `PW Competitor ${Date.now()}`, 'competitor name');
+    ], competitorName, 'competitor name');
     await clickFirst(page, [
       '[data-testid="save-competitor"]', 'button[type="submit"]',
       'button:has-text("Save")', 'button:has-text("Add")',
       'button:has-text("บันทึก")', 'button:has-text("เพิ่ม")'
     ], 'save competitor');
     await expectNoFatalPageError(page);
+    await expect(page.getByText(competitorName, { exact: false })).toBeVisible({ timeout: 10_000 });
   });
 
   test('CORE-04 Organizer locks registration and starts tournament', async ({ page }) => {
@@ -137,7 +139,7 @@ test.describe('Tournament Management — Core 15 E2E tests', () => {
     await expect(page.locator('[data-testid="bracket"], [data-testid="bracket-match"], .bracket').first()).toBeVisible();
   });
 
-  test('CORE-10 Knockout winners advance until a champion is determined', async ({ page }) => {
+  test('CORE-10 Knockout bracket is generated and contains match cards', async ({ page }) => {
     await login(page);
     await openTournamentOrCreate(page, 'Knockout');
     await clickFirst(page, [
@@ -146,8 +148,9 @@ test.describe('Tournament Management — Core 15 E2E tests', () => {
     ], 'generate knockout bracket');
     await expect(page.locator('[data-testid="bracket"], [data-testid="bracket-match"], .bracket').first()).toBeVisible();
     await expectNoFatalPageError(page);
-    // Full multi-round completion depends on seeded entrants and the app's result workflow.
-    // This assertion checks that the bracket UI is present; configure seeded data to exercise every round.
+    // This case currently verifies bracket generation, not a completed champion flow.
+    // Full champion verification needs registered entrants and the app-specific result workflow.
+    await expect(page.locator('[data-testid="bracket-match"], [data-testid="match-card"], .bracket-match').first()).toBeVisible();
   });
 
   test('CORE-11 Round-robin schedule contains match rows and standings', async ({ page }) => {
@@ -174,7 +177,7 @@ test.describe('Tournament Management — Core 15 E2E tests', () => {
     await expect(managementActions).toHaveCount(0);
   });
 
-  test('CORE-13 Invalid result data is rejected without changing saved result', async ({ page }) => {
+  test('CORE-13 Invalid result data is rejected with validation feedback', async ({ page }) => {
     await login(page);
     await openTournamentOrCreate(page, 'Swiss');
     await clickFirst(page, [
@@ -190,25 +193,30 @@ test.describe('Tournament Management — Core 15 E2E tests', () => {
       '[data-testid="submit-result"]', 'button:has-text("Submit Result")',
       'button:has-text("Save Result")', 'button:has-text("บันทึกผล")'
     ], 'submit invalid result');
-    await expect(page.locator('body')).toContainText(/invalid|error|required|ไม่ถูกต้อง|ข้อผิดพลาด|คะแนน/i);
+    const validationMessage = page.locator('[role="alert"], [data-testid*="error" i], .error, .invalid-feedback');
+    const bodyShowsValidation = await page.locator('body').getByText(/invalid|error|required|ไม่ถูกต้อง|ข้อผิดพลาด|คะแนนไม่ถูกต้อง/i).count();
+    const nativeValidation = await scoreInputs.nth(0).evaluate((el: HTMLInputElement) => !el.checkValidity());
+    expect(nativeValidation || (await validationMessage.count()) > 0 || bodyShowsValidation > 0,
+      'Invalid score submission should be blocked by native validation or show an explicit validation/error message.').toBeTruthy();
   });
 
   test('CORE-14 Saved tournament state persists after refresh', async ({ page }) => {
     await login(page);
-    await createTournament(page, 'Swiss');
-    const before = await page.locator('body').innerText();
+    const tournamentName = await createTournament(page, 'Swiss');
     await page.reload();
     await expectNoFatalPageError(page);
-    // Use a unique title in a real run; verify the saved list remains present after reload.
-    await expect(page.locator('body')).not.toBeEmpty();
-    expect(before.length).toBeGreaterThan(0);
+    await expect(page.getByText(tournamentName, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test('CORE-15 Rejected action shows a useful error and page remains usable', async ({ page }) => {
     await login(page, 'competitor');
     await page.goto('/admin');
     await expectNoFatalPageError(page);
-    // App may redirect or show an access-denied page. Either is acceptable, but no management view.
+    // A secure app should redirect the competitor away from /admin or explicitly deny access.
+    const pathname = new URL(page.url()).pathname;
+    const redirected = !/\/admin(?:[/?#]|$)/i.test(pathname);
+    const denied = await page.locator('body').getByText(/access denied|unauthorized|forbidden|ไม่มีสิทธิ์|ไม่ได้รับอนุญาต|ปฏิเสธการเข้าถึง/i).count();
+    expect(redirected || denied > 0, 'Expected redirect away from admin or an explicit access-denied message.').toBeTruthy();
     await expect(page.locator('[data-testid="admin-dashboard"], [data-testid="admin-management"]')).toHaveCount(0);
     await expect(page.locator('body')).not.toBeEmpty();
   });
