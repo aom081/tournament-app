@@ -1,0 +1,110 @@
+<testsuites id="" name="" tests="15" failures="0" skipped="14" errors="1" time="10.950313">
+<testsuite name="core-15.spec.ts" timestamp="2026-10-11T07:13:47.976Z" hostname="chromium" tests="15" failures="0" skipped="14" time="2.354" errors="1">
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-01 @smoke Organizer logs in with valid credentials" classname="core-15.spec.ts" time="2.354">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|core-15-Tournament-Managem-465d9-s-in-with-valid-credentials-chromium\test-failed-1.png]]
+
+[[ATTACHMENT|core-15-Tournament-Managem-465d9-s-in-with-valid-credentials-chromium\video.webm]]
+
+[[ATTACHMENT|core-15-Tournament-Managem-465d9-s-in-with-valid-credentials-chromium\error-context.md]]
+
+[[ATTACHMENT|core-15-Tournament-Managem-465d9-s-in-with-valid-credentials-chromium\trace.zip]]
+]]>
+</system-out>
+<error message="Cannot find visible input for &quot;email&quot;. Tried: [data-testid=&quot;email&quot;], input[type=&quot;email&quot;], input[name=&quot;email&quot;], input[autocomplete=&quot;username&quot;]" type="Error">
+<![CDATA[  [chromium] › core-15.spec.ts:8:7 › Tournament Management — Core 15 E2E tests › CORE-01 @smoke Organizer logs in with valid credentials 
+
+    Error: Cannot find visible input for "email". Tried: [data-testid="email"], input[type="email"], input[name="email"], input[autocomplete="username"]
+
+       at helpers.ts:32
+
+      30 |     }
+      31 |   }
+    > 32 |   throw new Error(`Cannot find visible input for "${description}". Tried: ${selectors.join(', ')}`);
+         |         ^
+      33 | }
+      34 |
+      35 | export async function firstVisible(page: Page, selectors: string[], description: string): Promise<Locator> {
+        at fillFirst (C:\Users\matem\OneDrive\เดสก์ท็อป\tournament-app\tournament-app\tournament-playwright\tests\helpers.ts:32:9)
+        at login (C:\Users\matem\OneDrive\เดสก์ท็อป\tournament-app\tournament-app\tournament-playwright\tests\helpers.ts:51:3)
+        at C:\Users\matem\OneDrive\เดสก์ท็อป\tournament-app\tournament-app\tournament-playwright\tests\core-15.spec.ts:9:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ..\test-results\core-15-Tournament-Managem-465d9-s-in-with-valid-credentials-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ..\test-results\core-15-Tournament-Managem-465d9-s-in-with-valid-credentials-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ..\test-results\core-15-Tournament-Managem-465d9-s-in-with-valid-credentials-chromium\error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\test-results\core-15-Tournament-Managem-465d9-s-in-with-valid-credentials-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\test-results\core-15-Tournament-Managem-465d9-s-in-with-valid-credentials-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</error>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-02 @smoke Organizer creates a tournament with one format" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-03 Organizer registers competitors and verifies roster" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-04 Organizer locks registration and starts tournament" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-05 @smoke Swiss creates valid first-round pairings" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-06 Organizer reviews cross-score pairing before publishing" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-07 Organizer records and confirms a match result" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-08 Correcting a confirmed result updates standings" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-09 Swiss-to-Knockout promotes top seeds into a bracket" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-10 Knockout bracket is generated and contains match cards" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-11 Round-robin schedule contains match rows and standings" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-12 Competitor can view but cannot manage a tournament" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-13 Invalid result data is rejected with validation feedback" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-14 Saved tournament state persists after refresh" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Tournament Management — Core 15 E2E tests › CORE-15 Rejected action shows a useful error and page remains usable" classname="core-15.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+</testsuites>

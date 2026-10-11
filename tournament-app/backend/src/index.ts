@@ -20,6 +20,15 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// --- API Root ---
+app.get('/', (_req: Request, res: Response) => {
+  res.status(200).json({
+    name: 'Tournament API',
+    status: 'ok',
+    health: '/health',
+  });
+});
+
 // --- Health Check ---
 app.get('/health', async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -50,6 +59,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 const server = app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`🔗 Server URL: http://localhost:${PORT}`);
   console.log(`🌐 CORS origin set to: ${CORS_ORIGIN}`);
 });
 
